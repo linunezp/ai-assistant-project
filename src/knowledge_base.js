@@ -1384,24 +1384,49 @@ class KnowledgeBase {
       // Detectar organización basándose en el contenido
       let renovaCount = 0;
       let plabacomCount = 0;
+      let rioCount = 0;
+      let portalPagosCount = 0;
       
       contentResult.rows.forEach(row => {
         const text = `${row.project_name || ''} ${row.file_path || ''} ${row.content || ''}`.toLowerCase();
         
-        // Patrones más específicos para RENOVA
+        // Patrones específicos para RENOVA
         if (/renova|blockchain|contract|solidity|transaction.*model|smart.*contract/i.test(text)) {
           renovaCount++;
         }
         
-        // Patrones más específicos para PLABACOM
+        // Patrones específicos para PLABACOM  
         if (/plabacom|coordinador\.plabacom|cl\.coordinador\.plabacom/i.test(text)) {
           plabacomCount++;
         }
+        
+        // Patrones específicos para RIO
+        if (/\brio\b|riobff|rioapp|rio-api|api-operational|operational.*instruction/i.test(text)) {
+          rioCount++;
+        }
+        
+        // Patrones específicos para PortalDePagos
+        if (/portal.*pago|ppagos|portal.*de.*pago|upgrade.*portal|payment.*portal|cadena.*pago|cadena.*garantia/i.test(text)) {
+          portalPagosCount++;
+        }
       });
       
-      const detectedOrganization = renovaCount > plabacomCount ? 'RENOVA' : 'PLABACOM';
+      // Determinar organización con mayor número de coincidencias
+      let detectedOrganization = 'PLABACOM'; // Default
+      const counts = {
+        'RENOVA': renovaCount,
+        'PLABACOM': plabacomCount,
+        'RIO': rioCount,
+        'PortalDePagos': portalPagosCount
+      };
       
-      logger.info(`Grupo ${groupId} - Organización detectada: ${detectedOrganization} (RENOVA: ${renovaCount}, PLABACOM: ${plabacomCount})`);
+      // Encontrar la organización con más coincidencias
+      const maxCount = Math.max(...Object.values(counts));
+      if (maxCount > 0) {
+        detectedOrganization = Object.keys(counts).find(org => counts[org] === maxCount);
+      }
+      
+      logger.info(`Grupo ${groupId} - Organización detectada: ${detectedOrganization} (RENOVA: ${renovaCount}, PLABACOM: ${plabacomCount}, RIO: ${rioCount}, PortalDePagos: ${portalPagosCount})`);
       
       return {
         ...groupInfo,
@@ -1409,6 +1434,8 @@ class KnowledgeBase {
         detection_stats: {
           renova_matches: renovaCount,
           plabacom_matches: plabacomCount,
+          rio_matches: rioCount,
+          portal_pagos_matches: portalPagosCount,
           content_samples: contentResult.rows.length
         }
       };

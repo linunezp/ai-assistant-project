@@ -1563,6 +1563,14 @@ Genera preguntas específicas y útiles en formato JSON:
         correctedAnswer = correctedAnswer.replace(new RegExp(`repositorios de ${correctOrganization} que me proporcionaste`, 'g'), `repositorios de ${correctOrganization}`);
       }
       
+      // También corregir si menciona otras organizaciones incorrectamente
+      const organizaciones = ['RIO', 'RENOVA', 'PLABACOM', 'PortalDePagos'];
+      organizaciones.forEach(org => {
+        if (org !== correctOrganization) {
+          correctedAnswer = correctedAnswer.replace(new RegExp(org, 'g'), correctOrganization);
+        }
+      });
+      
       return {
         answer: debugInfo + correctedAnswer,
         context: contextChunks, // Agregar contexto para debug
