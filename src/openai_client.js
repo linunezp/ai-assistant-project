@@ -42,10 +42,13 @@ class OpenAIClient {
    * Construye un prompt inteligente basado en el contexto y tipo de consulta
    * @param {string} userQuery - Consulta del usuario
    * @param {Array} contextChunks - Fragmentos de contexto relevantes
+   * @param {string} groupInfo - Información del grupo (opcional)
    * @returns {Array} Mensajes formateados para OpenAI
    */
-  buildPrompt(userQuery, contextChunks = []) {
-    const systemPrompt = `Eres un asistente especializado en la plataforma PLABACOM, diseñado para ayudar tanto a desarrolladores técnicos como a usuarios funcionales y de negocio.
+  buildPrompt(userQuery, contextChunks = [], groupInfo = '') {
+    // La organización se detectará automáticamente en el agent.js
+    
+    const systemPrompt = `Eres un asistente especializado en análisis de código y documentación, diseñado para ayudar tanto a desarrolladores técnicos como a usuarios funcionales y de negocio.
 
 TU AUDIENCIA:
 - DESARROLLADORES: Necesitan detalles técnicos, código, arquitectura, implementación
@@ -73,7 +76,7 @@ INSTRUCCIONES ESPECÍFICAS:
    - Responde en español
    - Sé específico y preciso
    - Usa el contexto proporcionado
-   - Mantén el foco en PLABACOM
+   - Mantén el foco en ${organizacion}
    - Si no tienes información suficiente, dilo claramente
 
 CONTEXTO DISPONIBLE:

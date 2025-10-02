@@ -1354,6 +1354,71 @@ class KnowledgeBase {
   }
 
   /**
+   * Obtiene información del grupo y detecta la organización basándose en el contenido indexado
+   * @param {number} groupId - ID del grupo
+   * @returns {Object} Información del grupo con organización detectada
+   */
+  async getGroupWithOrganization(groupId) {
+    await this.initialize();
+    const client = await this.pool.connect();
+    
+    try {
+      // Obtener información básica del grupo
+      const groupResult = await client.query(
+        'SELECT * FROM gitlab_groups WHERE group_id = $1',
+        [groupId]
+      );
+      
+      const groupInfo = groupResult.rows.length > 0 ? groupResult.rows[0] : null;
+      
+      // Obtener muestra de contenido para detectar organización
+      const contentResult = await client.query(`
+        SELECT d.project_name, d.file_path, dc.chunk_text as content
+        FROM documents d
+        JOIN document_chunks dc ON d.id = dc.document_id
+        WHERE d.group_id = $1 
+        ORDER BY d.created_at DESC
+        LIMIT 20
+      `, [groupId]);
+      
+      // Detectar organización basándose en el contenido
+      let renovaCount = 0;
+      let plabacomCount = 0;
+      
+      contentResult.rows.forEach(row => {
+        const text = `${row.project_name || ''} ${row.file_path || ''} ${row.content || ''}`.toLowerCase();
+        
+        // Patrones más específicos para RENOVA
+        if (/renova|blockchain|contract|solidity|transaction.*model|smart.*contract/i.test(text)) {
+          renovaCount++;
+        }
+        
+        // Patrones más específicos para PLABACOM
+        if (/plabacom|coordinador\.plabacom|cl\.coordinador\.plabacom/i.test(text)) {
+          plabacomCount++;
+        }
+      });
+      
+      const detectedOrganization = renovaCount > plabacomCount ? 'RENOVA' : 'PLABACOM';
+      
+      logger.info(`Grupo ${groupId} - Organización detectada: ${detectedOrganization} (RENOVA: ${renovaCount}, PLABACOM: ${plabacomCount})`);
+      
+      return {
+        ...groupInfo,
+        detected_organization: detectedOrganization,
+        detection_stats: {
+          renova_matches: renovaCount,
+          plabacom_matches: plabacomCount,
+          content_samples: contentResult.rows.length
+        }
+      };
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Registra un grupo de GitLab en la base de datos
    * @param {Object} groupInfo - Información del grupo
    * @returns {Object} Información del grupo registrado

@@ -39,10 +39,13 @@ class GeminiClient {
    * Construye el prompt del sistema con contexto
    * @param {string} userPrompt - Pregunta del usuario
    * @param {Array} contextChunks - Fragmentos de contexto relevantes
+   * @param {string} groupInfo - Información del grupo (opcional)
    * @returns {string} Prompt completo para Gemini
    */
-  buildPrompt(userPrompt, contextChunks = []) {
-    const systemPrompt = `Eres un asistente especializado en la plataforma PLABACOM, diseñado para ayudar tanto a desarrolladores técnicos como a usuarios funcionales y de negocio.
+  buildPrompt(userPrompt, contextChunks = [], groupInfo = '') {
+    // La organización se detectará automáticamente en el agent.js
+    
+    const systemPrompt = `Eres un asistente especializado en análisis de código y documentación, diseñado para ayudar tanto a desarrolladores técnicos como a usuarios funcionales y de negocio.
 
 TU AUDIENCIA:
 - DESARROLLADORES: Necesitan detalles técnicos, código, arquitectura, implementación
@@ -50,7 +53,7 @@ TU AUDIENCIA:
 - ANALISTAS DE NIVEL 1: Necesitan entender tanto aspectos técnicos como funcionales
 
 TU FUENTE DE CONOCIMIENTO:
-Repositorios de código fuente de GitLab de la plataforma PLABACOM que incluyen:
+Repositorios de código fuente que incluyen:
 - Servicios de proceso (cálculos energéticos, balances, precios)
 - Servicios de datos maestros (contratos, líneas, parámetros)
 - Interfaces web (componentes Angular/TypeScript)
@@ -82,7 +85,7 @@ FORMATO DE RESPUESTA:
 - Cita siempre las fuentes (archivos y proyectos)
 - Nunca inventes información que no esté en las fuentes
 
-INFORMACIÓN DE LOS REPOSITORIOS PLABACOM:`;
+INFORMACIÓN DE LOS REPOSITORIOS ${organizacion}:`;
 
     let contextSection = '';
     if (contextChunks && contextChunks.length > 0) {
@@ -177,7 +180,9 @@ INSTRUCCIÓN: Confirma que no existe, lista las alternativas similares, y explic
     }
 
     try {
-      const fullPrompt = this.buildPrompt(prompt, context);
+      // Si hay información de grupo en las opciones, pasarla a buildPrompt
+      const groupInfo = options.groupInfo || '';
+      const fullPrompt = this.buildPrompt(prompt, context, groupInfo);
       
       // Configuración de generación
       const generationConfig = {

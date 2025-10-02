@@ -196,6 +196,107 @@ class Agent {
   }
 
   /**
+   * Detecta la organización real basándose en el contenido de los chunks
+   * @param {Array} contextChunks - Los chunks de contexto
+   * @returns {Object} Información sobre la organización detectada
+   */
+  detectOrganizationFromContext(contextChunks) {
+    if (!contextChunks || contextChunks.length === 0) {
+      return { detected: false };
+    }
+
+    // Analizar patrones en paths y contenido
+    const patterns = {
+      RENOVA: [
+        /renova/i,
+        /\.renova\./i,
+        /\/renova\//i,
+        /renova[-_]/i,
+        /contract.*blockchain/i, // Contratos inteligentes suelen ser RENOVA
+        /solidity/i,
+        /transaction.*model/i
+      ],
+      PLABACOM: [
+        /plabacom/i,
+        /\.plabacom\./i,
+        /\/plabacom\//i,
+        /coordinador\.plabacom/i,
+        /cl\.coordinador\.plabacom/i
+      ]
+    };
+
+    let orgScores = { RENOVA: 0, PLABACOM: 0 };
+    let contentAnalysis = { RENOVA: 0, PLABACOM: 0 };
+
+    contextChunks.forEach(chunk => {
+      const fullPath = chunk.source?.file_path || '';
+      const content = chunk.content || '';
+      const projectName = chunk.source?.project_name || '';
+
+      // Analizar paths
+      Object.keys(patterns).forEach(org => {
+        patterns[org].forEach(pattern => {
+          if (pattern.test(fullPath)) orgScores[org] += 2;
+          if (pattern.test(content)) contentAnalysis[org] += 1;
+          if (pattern.test(projectName)) orgScores[org] += 1;
+        });
+      });
+    });
+
+    // Determinar organización predominante
+    const totalRenova = orgScores.RENOVA + contentAnalysis.RENOVA;
+    const totalPlabacom = orgScores.PLABACOM + contentAnalysis.PLABACOM;
+
+    let detectedOrg = null;
+    let inferredFromContent = null;
+
+    if (totalRenova > totalPlabacom) {
+      detectedOrg = 'RENOVA';
+    } else if (totalPlabacom > totalRenova) {
+      detectedOrg = 'PLABACOM';
+    }
+
+    // Detectar si el contenido sugiere una organización diferente
+    if (contentAnalysis.PLABACOM > 0 && detectedOrg === 'RENOVA') {
+      inferredFromContent = 'PLABACOM';
+    } else if (contentAnalysis.RENOVA > 0 && detectedOrg === 'PLABACOM') {
+      inferredFromContent = 'RENOVA';
+    }
+
+    logger.info(`Detección organizacional - RENOVA: ${totalRenova}, PLABACOM: ${totalPlabacom}, Detectada: ${detectedOrg}`);
+
+    return {
+      detected: detectedOrg !== null,
+      name: detectedOrg,
+      inferredFromContent: inferredFromContent,
+      scores: { RENOVA: totalRenova, PLABACOM: totalPlabacom }
+    };
+  }
+
+  /**
+   * Obtiene la organización correspondiente al grupo seleccionado consultando la BD
+   * @param {number} groupId - ID del grupo seleccionado por el usuario
+   * @returns {Promise<string>} Nombre de la organización detectada
+   */
+  async getOrganizationForGroup(groupId) {
+    try {
+      // Usar el método especializado de la base de conocimiento
+      const groupInfo = await this.knowledgeBase.getGroupWithOrganization(groupId);
+      
+      if (!groupInfo) {
+        logger.info(`Grupo ${groupId} no encontrado, usando PLABACOM por defecto`);
+        return 'PLABACOM';
+      }
+      
+      return groupInfo.detected_organization || 'PLABACOM';
+      
+    } catch (error) {
+      logger.error(`Error detectando organización para grupo ${groupId}:`, error.message);
+      return 'PLABACOM'; // Fallback por defecto
+    }
+  }
+
+  /**
    * Construye el prompt del sistema para Claude
    */
   buildSystemPrompt(contextChunks) {
@@ -1425,15 +1526,16 @@ Genera preguntas específicas y útiles en formato JSON:
           temperature: responseStrategy === 'high_confidence' ? 0.1 : responseStrategy === 'medium_confidence' ? 0.3 : 0.5, 
           max_tokens: 4000 
         };
-        const aiResponse = await currentClient.generateResponse(prompt, contextChunks, openaiOptions);
+        const messages = currentClient.buildPrompt(prompt, contextChunks, `grupo ${groupId}`);
+        const aiResponse = await currentClient.generateResponse(messages, openaiOptions);
         // Adaptar respuesta de OpenAI al formato esperado
         response = {
           answer: aiResponse.response,
           metadata: aiResponse
         };
       } else {
-        // Para Gemini, usar el método existente
-        response = await currentClient.getAnswer(prompt, contextChunks);
+        // Para Gemini, usar el método existente con información del grupo
+        response = await currentClient.getAnswer(prompt, contextChunks, { groupInfo: `grupo ${groupId}` });
       }
 
       // Preparar metadatos de la respuesta
@@ -1450,8 +1552,19 @@ Genera preguntas específicas y útiles en formato JSON:
       // Agregar información de debugging al inicio de la respuesta
       const debugInfo = `🔍 **[GRUPO ${groupId}]** Consultando en grupo ${groupId} | Encontrados ${contextChunks.length} chunks | Proyectos: ${[...new Set(contextChunks.map(c => c.source?.project_name).filter(p => p))].slice(0, 3).join(', ')}${contextChunks.length > 3 ? '...' : ''}\n\n`;
       
+      // Corrección de organización basada en la selección del grupo del usuario
+      let correctedAnswer = response.answer;
+      const correctOrganization = await this.getOrganizationForGroup(groupId);
+      
+      // Corregir referencias incorrectas a organizaciones
+      if (correctOrganization !== 'PLABACOM') {
+        // Reemplazar PLABACOM por la organización correcta si es diferente
+        correctedAnswer = correctedAnswer.replace(/PLABACOM/g, correctOrganization);
+        correctedAnswer = correctedAnswer.replace(new RegExp(`repositorios de ${correctOrganization} que me proporcionaste`, 'g'), `repositorios de ${correctOrganization}`);
+      }
+      
       return {
-        answer: debugInfo + response.answer,
+        answer: debugInfo + correctedAnswer,
         context: contextChunks, // Agregar contexto para debug
         metadata: {
           processing_time: Date.now() - startTime,

@@ -53,6 +53,13 @@ class ClaudeClient {
    * @returns {string} Prompt del sistema optimizado
    */
   buildPrompt(userQuery, context, groupName = 'repositorio') {
+    // Extraer organización desde groupName si viene en formato "grupo XXXX"
+    let organizacion = 'PLABACOM';
+    if (groupName && groupName.includes('1439')) {
+      organizacion = 'RENOVA';
+    }
+    // TODO: Hacer esto más dinámico con mapeo configurable
+    
     // Detectar el tipo de audiencia y consulta
     const queryLower = userQuery.toLowerCase();
     
@@ -65,7 +72,7 @@ class ClaudeClient {
     // Detectar consultas específicas de archivos
     const isFileQuery = /\.(java|js|ts|py|php|cs|cpp|c|h)\b/i.test(userQuery);
     
-    let systemPrompt = `Eres un asistente de IA especializado en análisis de código y documentación para el grupo ${groupName}.
+    let systemPrompt = `Eres un asistente de IA especializado en análisis de código y documentación para el ${groupName}.
 
 Tu OBJETIVO principal es servir de ayuda a:
 1. 👨‍💻 Técnicos desarrolladores - Proporcionando detalles técnicos, código, arquitectura, implementación
