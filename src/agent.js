@@ -274,6 +274,64 @@ class Agent {
   }
 
   /**
+   * Obtiene todas las organizaciones conocidas del sistema con cache
+   * @returns {Promise<Array<string>>} Lista de organizaciones conocidas
+   */
+  async getKnownOrganizations() {
+    // Cache de organizaciones con TTL de 5 minutos
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+    const now = Date.now();
+    
+    if (this._organizationsCache && 
+        this._organizationsCacheTime && 
+        (now - this._organizationsCacheTime) < CACHE_TTL) {
+      return this._organizationsCache;
+    }
+    
+    try {
+      // Obtener todos los grupos con contenido
+      const allGroups = await this.knowledgeBase.pool.query(`
+        SELECT DISTINCT group_id FROM documents 
+        WHERE group_id IS NOT NULL 
+        ORDER BY group_id
+      `);
+      
+      const organizacionesSet = new Set();
+      
+      // Obtener organización de cada grupo (máximo 10 para evitar sobrecarga)
+      const groupsToCheck = allGroups.rows.slice(0, 10);
+      
+      for (const group of groupsToCheck) {
+        try {
+          const groupInfo = await this.knowledgeBase.getGroupWithOrganization(parseInt(group.group_id));
+          if (groupInfo && groupInfo.detected_organization) {
+            organizacionesSet.add(groupInfo.detected_organization);
+          }
+        } catch (error) {
+          logger.warn(`Error detectando organización para grupo ${group.group_id}:`, error.message);
+        }
+      }
+      
+      const organizaciones = Array.from(organizacionesSet);
+      
+      // Actualizar cache
+      this._organizationsCache = organizaciones;
+      this._organizationsCacheTime = now;
+      
+      logger.info(`Cache de organizaciones actualizado: ${organizaciones.join(', ')}`);
+      return organizaciones;
+      
+    } catch (error) {
+      logger.error('Error obteniendo organizaciones conocidas:', error.message);
+      // Fallback a lista conocida
+      const fallback = ['RIO', 'RENOVA', 'PLABACOM', 'PortalDePagos'];
+      this._organizationsCache = fallback;
+      this._organizationsCacheTime = now;
+      return fallback;
+    }
+  }
+
+  /**
    * Obtiene la organización correspondiente al grupo seleccionado consultando la BD
    * @param {number} groupId - ID del grupo seleccionado por el usuario
    * @returns {Promise<string>} Nombre de la organización detectada
@@ -1564,8 +1622,9 @@ Genera preguntas específicas y útiles en formato JSON:
       }
       
       // También corregir si menciona otras organizaciones incorrectamente
-      const organizaciones = ['RIO', 'RENOVA', 'PLABACOM', 'PortalDePagos'];
-      organizaciones.forEach(org => {
+      // Usar cache de organizaciones conocidas con actualización periódica
+      const organizacionesConocidas = await this.getKnownOrganizations();
+      organizacionesConocidas.forEach(org => {
         if (org !== correctOrganization) {
           correctedAnswer = correctedAnswer.replace(new RegExp(org, 'g'), correctOrganization);
         }
