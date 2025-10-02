@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant - Indexador de Grupos GitLab</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: #2d3748; color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { opacity: 0.8; font-size: 1.1em; }
+        .content { padding: 40px; }
+        .form-group { margin-bottom: 25px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #2d3748; }
+        .form-group input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        .form-group input:focus { outline: none; border-color: #667eea; }
+        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s; width: 100%; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .progress-container { display: none; margin-top: 30px; padding: 25px; background: #f7fafc; border-radius: 8px; border-left: 4px solid #667eea; }
+        .progress-steps { list-style: none; }
+        .progress-step { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+        .progress-step:last-child { border-bottom: none; }
+        .step-icon { width: 24px; height: 24px; border-radius: 50%; margin-right: 15px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .step-icon.pending { background: #e2e8f0; color: #64748b; }
+        .step-icon.active { background: #667eea; color: white; animation: pulse 2s infinite; }
+        .step-icon.completed { background: #10b981; color: white; }
+        .step-icon.error { background: #ef4444; color: white; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .step-text { flex-grow: 1; }
+        .step-details { font-size: 14px; color: #64748b; margin-top: 5px; }
+        .result-container { display: none; margin-top: 20px; padding: 20px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9; }
+        .error-container { display: none; margin-top: 20px; padding: 20px; background: #fef2f2; border-radius: 8px; border-left: 4px solid #ef4444; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-top: 15px; }
+        .stat { text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-number { font-size: 24px; font-weight: bold; color: #2d3748; }
+        .stat-label { font-size: 12px; color: #64748b; margin-top: 5px; }
+        
+        /* Chat interface styles */
+        .chat-container { display: none; margin-top: 30px; }
+        .chat-header { background: #f7fafc; padding: 20px; border-radius: 8px 8px 0 0; border-left: 4px solid #10b981; }
+        .chat-header h3 { color: #2d3748; margin-bottom: 10px; }
+        .group-info { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .group-badge { background: #10b981; color: white; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+        .group-stats { font-size: 14px; color: #64748b; }
+        .chat-messages { background: white; max-height: 600px; overflow-y: auto; padding: 20px; border-left: 4px solid #10b981; }
+        .message { margin-bottom: 20px; }
+        .message.user { text-align: right; }
+        .message.assistant { text-align: left; }
+        .message-content { display: inline-block; padding: 16px 20px; border-radius: 12px; max-width: 90%; }
+        .message.user .message-content { background: #667eea; color: white; }
+        .message.assistant .message-content { background: #f1f5f9; color: #2d3748; border: 1px solid #e2e8f0; }
+        
+        /* Formatted message styles */
+        .formatted-response { font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .formatted-response h1, .formatted-response h2, .formatted-response h3 { color: #1a202c; margin: 16px 0 8px 0; font-weight: 600; }
+        .formatted-response h1 { font-size: 1.5em; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
+        .formatted-response h2 { font-size: 1.3em; color: #2d3748; }
+        .formatted-response h3 { font-size: 1.1em; color: #4a5568; }
+        .formatted-response p { margin: 12px 0; line-height: 1.6; }
+        .formatted-response ul, .formatted-response ol { margin: 12px 0; padding-left: 24px; }
+        .formatted-response li { margin: 6px 0; line-height: 1.5; }
+        .formatted-response .section { margin: 20px 0; }
+        .formatted-response .subsection { margin: 16px 0 16px 16px; padding-left: 16px; border-left: 3px solid #e2e8f0; }
+        .formatted-response .code-block { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin: 12px 0; font-family: 'SF Mono', Monaco, monospace; font-size: 0.9em; overflow-x: auto; }
+        .formatted-response .inline-code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 0.9em; }
+        .formatted-response .highlight { background: #fef5e7; padding: 2px 4px; border-radius: 3px; }
+        .formatted-response .recommendation { background: #f0fff4; border-left: 4px solid #38a169; padding: 12px; margin: 12px 0; border-radius: 4px; }
+        .formatted-response .warning { background: #fffaf0; border-left: 4px solid #ed8936; padding: 12px; margin: 12px 0; border-radius: 4px; }
+        .formatted-response .analysis-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .formatted-response .icon { font-size: 1.2em; margin-right: 8px; }
+        .formatted-response .bullet-point { margin: 8px 0; padding-left: 16px; position: relative; }
+        .formatted-response .bullet-point::before { content: '▸'; position: absolute; left: 0; color: #667eea; font-weight: bold; }
+        
+        .chat-input-container { background: #f7fafc; padding: 20px; border-radius: 0 0 8px 8px; border-left: 4px solid #10b981; }
+        .chat-input-group { display: flex; gap: 10px; }
+        .chat-input { flex: 1; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; }
+        .chat-input:focus { outline: none; border-color: #667eea; }
+        .chat-btn { background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .chat-btn:hover { background: #059669; }
+        .chat-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        /* Group selector styles */
+        .group-selector { 
+            margin-bottom: 25px; 
+            padding: 25px; 
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+            border-radius: 12px; 
+            border-left: 4px solid #0ea5e9; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+        }
+        .selector-title { 
+            font-weight: 600; 
+            color: #1e293b; 
+            margin-bottom: 15px; 
+            font-size: 1.1em; 
+        }
+        .group-list { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 12px; 
+            margin-bottom: 20px; 
+        }
+        .group-item { 
+            padding: 10px 18px; 
+            background: white; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .group-item:hover { 
+            border-color: #667eea; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .group-item.active { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            border-color: #667eea; 
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .new-group-section { 
+            border-top: 2px solid #e2e8f0; 
+            padding-top: 20px; 
+            margin-top: 20px; 
+            background: rgba(255,255,255,0.5);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .inline-form { 
+            display: flex; 
+            gap: 15px; 
+            align-items: flex-end; 
+            flex-wrap: wrap;
+        }
+        .inline-input { 
+            flex: 1; 
+            min-width: 200px;
+        }
+        .inline-input label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+        }
+        .inline-input input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            background: white;
+        }
+        .inline-input input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn-secondary { 
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%); 
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .btn-secondary:hover { 
+            background: linear-gradient(135deg, #475569 0%, #334155 100%); 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        /* Search functionality styles */
+        .search-container {
+            margin-bottom: 20px;
+        }
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 16px;
+            border: 2px solid #d1d5db;
+            border-radius: 25px;
+            font-size: 14px;
+            background: white;
+            transition: all 0.2s ease;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .search-clear {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+        .search-clear:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        /* Enhanced group item styles */
+        .group-item {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            min-width: 200px;
+        }
+        .group-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .group-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+        }
+        .group-item-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .group-item-stats {
+            font-size: 12px;
+            opacity: 0.8;
+            display: flex;
+            gap: 12px;
+        }
+        .group-item.active .group-item-stats {
+            opacity: 0.9;
+        }
+        
+        /* Selected group info styles */
+        .selected-group-info {
+            margin-top: 20px;
+            padding: 16px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+        .info-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .selected-group-details {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        /* No results message */
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        /* AI Provider selector styles */
+        .ai-provider-section {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .provider-header h3 {
+            color: #2d3748;
+            margin-bottom: 5px;
+            font-size: 1.2em;
+        }
+
+        .provider-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .provider-option {
+            position: relative;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .provider-option:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .provider-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .provider-option label {
+            display: block;
+            padding: 20px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .provider-option input[type="radio"]:checked + label {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .provider-option input[type="radio"]:checked + label .provider-desc {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Ensure the entire card gets the selected style */
+        .provider-option:has(input[type="radio"]:checked) {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .provider-option:has(input[type="radio"]:checked) label {
+            background: transparent;
+            color: white;
+        }
+
+        .provider-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .provider-desc {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+
+        .current-provider {
+            font-weight: 500;
+        }
+
+        .current-provider #activeProvider {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            z-index: 1001;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .modal-header .icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+            color: #f59e0b;
+        }
+
+        .modal-body {
+            margin-bottom: 25px;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-btn.cancel {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #cbd5e0;
+        }
+
+        .modal-btn.confirm {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .modal-btn.confirm:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Accordion styles */
+        .group-selector {
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .accordion-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .accordion-header:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+
+        .accordion-icon {
+            transition: transform 0.3s ease;
+            font-size: 1.2em;
+        }
+
+        .accordion-header.active .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: white;
+        }
+
+        .accordion-content.active {
+            max-height: 400px;
+            padding: 20px;
+        }
+
+        /* Export button styles */
+        .export-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .export-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Footer styles */
+        .footer {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+            font-size: 14px;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .footer-icon {
+            font-size: 16px;
+            animation: pulse 2s infinite;
+        }
+
+        .footer-text {
+            font-weight: 500;
+        }
+
+        .footer-highlight {
+            font-weight: 600;
+            color: #ffd700;
+        }
+
+        .footer-divider {
+            color: rgba(255, 255, 255, 0.6);
+            margin: 0 5px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @media (max-width: 768px) {
+            .footer-content {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .footer-divider {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Assistant</h1>
+            <p>Indexador Inteligente de Grupos GitLab</p>
+        </div>
+        
+        <div class="content">
+            <!-- Group Selector -->
+            <div class="group-selector" id="groupSelector">
+                <div class="accordion-header" id="accordionHeader">
+                    <div>
+                        <div style="font-size: 1.1em; font-weight: 600;">🗂️ Grupos Principal Indexados</div>
+                        <div style="font-size: 0.85em; opacity: 0.9; margin-top: 2px;" id="accordionSubtitle">
+                            Ningún grupo seleccionado
+                        </div>
+                    </div>
+                    <span class="accordion-icon">▼</span>
+                </div>
+                
+                <div class="accordion-content" id="accordionContent">
+                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9em;">
+                        Selecciona un grupo principal. Todas las consultas incluirán automáticamente todos los repositorios y subgrupos contenidos.
+                    </p>
+                    
+                    <!-- Search Box -->
+                    <div class="search-container" id="searchContainer" style="display: none;">
+                        <div class="search-box">
+                            <input 
+                                type="text" 
+                                id="groupSearch" 
+                                placeholder="🔍 Buscar grupo principal por nombre o ID..." 
+                                class="search-input"
+                            >
+                            <button type="button" class="search-clear" id="searchClear">✕</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Groups List -->
+                    <div class="group-list" id="groupList">
+                        <div class="loading">Cargando grupos...</div>
+                    </div>
+                </div>
+                
+                <!-- Selected Group Info -->
+                <div class="selected-group-info" id="selectedGroupInfo" style="display: none;">
+                    <div class="info-header">📋 Base de Conocimiento Activa:</div>
+                    <div class="selected-group-details" id="selectedGroupDetails"></div>
+                    <div style="font-size: 12px; margin-top: 8px; opacity: 0.9;">
+                        ℹ️ Incluye todos los repositorios y subgrupos dentro de este grupo principal
+                    </div>
+                </div>
+                
+                <div class="new-group-section">
+                    <div class="selector-title">➕ Indexar Nuevo Grupo Principal</div>
+                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9em;">
+                        Ingresa el ID del grupo principal de GitLab. Se indexarán automáticamente todos sus repositorios y subgrupos.
+                    </p>
+                    <form id="indexForm" class="inline-form">
+                        <div class="form-group inline-input">
+                            <label for="groupId">
+                                <span style="color: #374151;">🆔 ID del Grupo Principal GitLab</span>
+                            </label>
+                            <input 
+                                type="number" 
+                                id="groupId" 
+                                placeholder="Ejemplo: 890" 
+                                required
+                                min="1"
+                                step="1"
+                            >
+                        </div>
+                        <button type="submit" class="btn btn-secondary" id="submitBtn">
+                            🚀 Indexar Grupo Principal
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Repository Platform Selector -->
+            <div class="platform-provider-section" id="platformProviderSection" style="display: none;">
+                <div class="provider-header">
+                    <h3>📦 Selecciona la Plataforma de Repositorio</h3>
+                    <p style="color: #6b7280; font-size: 0.9em; margin-top: 5px;">Elige entre GitLab o GitHub para acceder a los repositorios</p>
+                </div>
+                <div class="provider-options">
+                    <div class="provider-option" data-platform="gitlab">
+                        <input type="radio" id="gitlab" name="repositoryPlatform" value="gitlab" checked>
+                        <label for="gitlab">
+                            <div class="provider-info">
+                                <div class="provider-name">🦊 GitLab</div>
+                                <div class="provider-desc">Acceso a repositorios de GitLab</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="provider-option" data-platform="github">
+                        <input type="radio" id="github" name="repositoryPlatform" value="github">
+                        <label for="github">
+                            <div class="provider-info">
+                                <div class="provider-name">🐙 GitHub</div>
+                                <div class="provider-desc">Acceso a repositorios de GitHub</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Provider Selector -->
+            <div class="ai-provider-section" id="aiProviderSection" style="display: none;">
+                <div class="provider-header">
+                    <h3>🤖 Selecciona el Motor de IA</h3>
+                    <p style="color: #6b7280; font-size: 0.9em; margin-top: 5px;">Elige qué modelo de IA quieres usar para tus consultas</p>
+                </div>
+                <div class="provider-options">
+                    <div class="provider-option" data-provider="gemini">
+                        <input type="radio" id="gemini" name="aiProvider" value="gemini" checked>
+                        <label for="gemini">
+                            <div class="provider-info">
+                                <div class="provider-name">🌟 Google Gemini</div>
+                                <div class="provider-desc">Rápido y eficiente para consultas técnicas</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="provider-option" data-provider="claude">
+                        <input type="radio" id="claude" name="aiProvider" value="claude">
+                        <label for="claude">
+                            <div class="provider-info">
+                                <div class="provider-name">🧠 Anthropic Claude</div>
+                                <div class="provider-desc">Análisis detallado y respuestas estructuradas</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="provider-option" data-provider="openai">
+                        <input type="radio" id="openai" name="aiProvider" value="openai">
+                        <label for="openai">
+                            <div class="provider-info">
+                                <div class="provider-name">⚡ OpenAI GPT</div>
+                                <div class="provider-desc">Comprensión avanzada y respuestas versátiles</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Interface -->
+            <div class="chat-container" id="chatContainer">
+                <div class="chat-header">
+                    <h3>💬 Consulta al Asistente</h3>
+                    <div class="group-info" id="activeGroupInfo">
+                        <span class="group-badge" id="activeGroupBadge">Ningún grupo seleccionado</span>
+                        <span class="group-stats" id="activeGroupStats"></span>
+                    </div>
+                    <div class="current-provider" id="currentProvider" style="margin-top: 10px; font-size: 0.9em; color: #6b7280;">
+                        🤖 Motor activo: <span id="activeProvider">Gemini</span>
+                    </div>
+                </div>
+                
+                <!-- Export controls -->
+                <div class="export-controls">
+                    <button class="export-btn" id="exportBtn" disabled>
+                        📄 Descargar conversación PDF
+                    </button>
+                </div>
+
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message assistant">
+                        <div class="message-content">
+                            ¡Hola! Soy tu asistente de IA. Puedo ayudarte a consultar información sobre los proyectos indexados. ¿Qué te gustaría saber?
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <div class="chat-input-group">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Escribe tu pregunta aquí..." />
+                        <button id="sendBtn" class="chat-btn">Enviar</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="progress-container" id="progressContainer">
+                <h3>📊 Progreso de Indexación</h3>
+                <ul class="progress-steps" id="progressSteps">
+                    <li class="progress-step">
+                        <div class="step-icon pending" id="step1">1</div>
+                        <div class="step-text">
+                            <div>Inicializando</div>
+                            <div class="step-details" id="step1-details">Preparando el sistema...</div>
+                        </div>
+                    </li>
+                    <li class="progress-step">
+                        <div class="step-icon pending" id="step2">2</div>
+                        <div class="step-text">
+                            <div>Detectando Grupo</div>
+                            <div class="step-details" id="step2-details">Obteniendo información del grupo...</div>
+                        </div>
+                    </li>
+                    <li class="progress-step">
+                        <div class="step-icon pending" id="step3">3</div>
+                        <div class="step-text">
+                            <div>Clonando Repositorios</div>
+                            <div class="step-details" id="step3-details">Descargando proyectos...</div>
+                        </div>
+                    </li>
+                    <li class="progress-step">
+                        <div class="step-icon pending" id="step4">4</div>
+                        <div class="step-text">
+                            <div>Indexando Contenido</div>
+                            <div class="step-details" id="step4-details">Procesando archivos y generando embeddings...</div>
+                        </div>
+                    </li>
+                    <li class="progress-step">
+                        <div class="step-icon pending" id="step5">5</div>
+                        <div class="step-text">
+                            <div>Completado</div>
+                            <div class="step-details" id="step5-details">Listo para consultas...</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="result-container" id="resultContainer">
+                <h3>✅ Indexación Completada</h3>
+                <div class="stats" id="stats">
+                </div>
+            </div>
+            
+            <div class="error-container" id="errorContainer">
+                <h3>❌ Error en la Indexación</h3>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let pollingInterval = null;
+        let activeGroupId = null;
+        let indexedGroups = [];
+        let filteredGroups = [];
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadIndexedGroups();
+            setupEventListeners();
+            setupSearchFunctionality();
+        });
+
+        async function loadIndexedGroups() {
+            try {
+                const response = await fetch('/api/groups');
+                const data = await response.json();
+                
+                if (data.success && data.groups && data.groups.length > 0) {
+                    // Solo mostrar grupos de primer nivel (grupos padre)
+                    indexedGroups = data.groups;
+                    filteredGroups = [...indexedGroups];
+                    
+                    // Show search if there are multiple groups
+                    if (indexedGroups.length > 1) {
+                        document.getElementById('searchContainer').style.display = 'block';
+                    }
+                    
+                    renderGroupList();
+                    
+                    // Select the first group by default after a small delay
+                    setTimeout(() => {
+                        selectGroup(indexedGroups[0]);
+                        showChatInterface();
+                    }, 100);
+                } else {
+                    // No groups indexed, show indexing form
+                    console.log('No indexed groups found, showing indexing form');
+                    showIndexingForm();
+                }
+            } catch (error) {
+                console.error('Error loading groups:', error);
+                showIndexingForm();
+            }
+        }
+
+        function renderGroupList() {
+            const groupList = document.getElementById('groupList');
+            groupList.innerHTML = '';
+            
+            if (filteredGroups.length === 0) {
+                groupList.innerHTML = '<div class="no-results">No se encontraron grupos que coincidan con la búsqueda</div>';
+                return;
+            }
+            
+            filteredGroups.forEach(group => {
+                const groupItem = document.createElement('div');
+                groupItem.className = 'group-item';
+                groupItem.setAttribute('data-group-id', group.id);
+                
+                groupItem.innerHTML = `
+                    <div class="group-item-name">${group.name}</div>
+                    <div class="group-item-stats">
+                        <span>🆔 ${group.id}</span>
+                        <span>📁 ${group.repositoryCount} repos</span>
+                        <span>📄 ${group.chunkCount} chunks</span>
+                    </div>
+                `;
+                
+                // Store group data for later access
+                groupItem._groupData = group;
+                
+                groupItem.onclick = (event) => {
+                    event.preventDefault();
+                    showGroupChangeModal(group);
+                };
+                groupList.appendChild(groupItem);
+            });
+        }
+
+        function selectGroup(group, event = null) {
+            console.log('selectGroup called with:', group);
+            // Update active group
+            activeGroupId = group.id;
+            
+            // Update UI - remove active class from all groups
+            document.querySelectorAll('.group-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Add active class to selected group
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            } else {
+                // If no event (called programmatically), find and activate the group by ID
+                const targetItem = document.querySelector(`[data-group-id="${group.id}"]`);
+                if (targetItem) {
+                    targetItem.classList.add('active');
+                }
+            }
+            
+            // Update selected group info
+            const selectedInfo = document.getElementById('selectedGroupInfo');
+            const selectedDetails = document.getElementById('selectedGroupDetails');
+            
+            selectedInfo.style.display = 'block';
+            selectedDetails.innerHTML = `
+                <strong>${group.name}</strong> (ID: ${group.id})<br>
+                📁 ${group.repositoryCount} repositorios indexados • 📄 ${group.chunkCount} chunks de conocimiento disponibles
+            `;
+            
+            // Update chat header
+            const badge = document.getElementById('activeGroupBadge');
+            const stats = document.getElementById('activeGroupStats');
+            
+            badge.textContent = group.name + ' (' + group.id + ')';
+            stats.textContent = group.repositoryCount + ' repositorios • ' + group.chunkCount + ' chunks';
+            
+            // Update accordion subtitle
+            const accordionSubtitle = document.getElementById('accordionSubtitle');
+            if (accordionSubtitle) {
+                accordionSubtitle.textContent = `${group.name} (${group.repositoryCount} repositorios)`;
+                console.log('Updated accordion subtitle:', accordionSubtitle.textContent);
+            }
+            
+            // Close accordion after selection
+            const header = document.querySelector('.accordion-header');
+            const content = document.getElementById('accordionContent');
+            if (header) header.classList.remove('active');
+            if (content) content.classList.remove('active');
+            
+            console.log('selectGroup completed for:', group.name);
+        }
+
+        function showChatInterface() {
+            document.getElementById('platformProviderSection').style.display = 'block';
+            document.getElementById('aiProviderSection').style.display = 'block';
+            document.getElementById('chatContainer').style.display = 'block';
+        }
+
+        function showIndexingForm() {
+            // Chat is hidden by default, just show the indexing form
+            console.log('No indexed groups found, showing indexing form');
+        }
+
+        function setupEventListeners() {
+            // Indexing form
+            document.getElementById('indexForm').addEventListener('submit', handleIndexing);
+            
+            // Chat functionality
+            document.getElementById('sendBtn').addEventListener('click', sendMessage);
+            document.getElementById('chatInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // Accordion functionality
+            document.getElementById('accordionHeader').addEventListener('click', toggleGroupAccordion);
+
+            // Export functionality
+            document.getElementById('exportBtn').addEventListener('click', exportConversationPDF);
+
+            // Modal functionality
+            document.getElementById('modalCancelBtn').addEventListener('click', cancelGroupChange);
+            document.getElementById('modalConfirmBtn').addEventListener('click', confirmGroupChange);
+
+            // Close modal when clicking overlay
+            document.getElementById('modalOverlay').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    cancelGroupChange();
+                }
+            });
+        }
+        
+        function setupSearchFunctionality() {
+            const searchInput = document.getElementById('groupSearch');
+            const searchClear = document.getElementById('searchClear');
+            
+            // Search input event listener
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                filterGroups(searchTerm);
+                
+                // Show/hide clear button
+                searchClear.style.display = searchTerm ? 'block' : 'none';
+            });
+            
+            // Clear search button
+            searchClear.addEventListener('click', function() {
+                searchInput.value = '';
+                searchClear.style.display = 'none';
+                filterGroups('');
+                searchInput.focus();
+            });
+            
+            // Enter key to focus first result
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && filteredGroups.length > 0) {
+                    selectGroup(filteredGroups[0]);
+                }
+            });
+        }
+        
+        function filterGroups(searchTerm) {
+            if (!searchTerm) {
+                filteredGroups = [...indexedGroups];
+            } else {
+                filteredGroups = indexedGroups.filter(group => 
+                    group.name.toLowerCase().includes(searchTerm) ||
+                    group.id.toString().includes(searchTerm)
+                );
+            }
+            
+            renderGroupList();
+            
+            // If current selected group is not in filtered results, select first available
+            if (activeGroupId && !filteredGroups.find(g => g.id === activeGroupId) && filteredGroups.length > 0) {
+                selectGroup(filteredGroups[0]);
+            }
+        }
+
+        async function handleIndexing(e) {
+            e.preventDefault();
+            
+            const groupId = document.getElementById('groupId').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const progressContainer = document.getElementById('progressContainer');
+            const resultContainer = document.getElementById('resultContainer');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Iniciando...';
+            progressContainer.style.display = 'block';
+            resultContainer.style.display = 'none';
+            errorContainer.style.display = 'none';
+            resetSteps();
+            
+            try {
+                const response = await fetch('/groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groupId: groupId, async: true })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Error iniciando indexación');
+                }
+                
+                currentJobId = data.jobId;
+                updateStep(1, 'active', 'Trabajo iniciado correctamente');
+                startPolling();
+                
+            } catch (error) {
+                showError(error.message);
+                resetForm();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || !activeGroupId) return;
+            
+            // Add user message to chat
+            addMessageToChat('user', message);
+            input.value = '';
+            
+            // Disable send button
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Enviando...';
+            
+            try {
+                // Get selected AI provider
+                const selectedProvider = document.querySelector('input[name="aiProvider"]:checked').value;
+                
+                // Log de debugging
+                console.log('🔍 ENVIANDO CONSULTA:', {
+                    prompt: message,
+                    groupId: activeGroupId,
+                    aiProvider: selectedProvider,
+                    timestamp: new Date().toISOString()
+                });
+
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: message,
+                        groupId: activeGroupId,
+                        aiProvider: selectedProvider
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Log de debugging de respuesta
+                console.log('📋 RESPUESTA RECIBIDA:', {
+                    success: data.success,
+                    group_used: data.response?.metadata?.group_filter,
+                    debug_info: data.response?.metadata?.debug_info,
+                    context_chunks: data.response?.metadata?.context_chunks_count,
+                    timestamp: new Date().toISOString()
+                });
+                
+                if (data.success) {
+                    addMessageToChat('assistant', data.response.answer);
+                } else {
+                    addMessageToChat('assistant', 'Lo siento, hubo un error al procesar tu consulta: ' + (data.error || 'Error desconocido'));
+                }
+            } catch (error) {
+                addMessageToChat('assistant', 'Lo siento, no pude conectar con el servidor. Por favor, inténtalo de nuevo.');
+            }
+            
+            // Re-enable send button
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Enviar';
+        }
+
+        function formatTechnicalResponse(text) {
+            if (!text) return '';
+            
+            // Convert text to HTML with proper formatting
+            let html = text
+                // Convert emoji analysis indicators to styled headers
+                .replace(/🔍\s*([^:\n]+):?/g, '<div class="analysis-section"><h2><span class="icon">🔍</span>$1</h2>')
+                .replace(/📊\s*([^:\n]+):?/g, '<div class="analysis-section"><h2><span class="icon">📊</span>$1</h2>')
+                .replace(/⚡\s*([^:\n]+):?/g, '<div class="analysis-section"><h2><span class="icon">⚡</span>$1</h2>')
+                
+                // Convert numbered sections to structured format
+                .replace(/(\d+)\.\s*\*\*([^*]+)\*\*:?/g, '<div class="section"><h3>$1. $2</h3>')
+                .replace(/\*\*([^*]+)\*\*:?/g, '<h3>$1</h3>')
+                
+                // Convert bullet points with dashes
+                .replace(/^\s*-\s+(.+)$/gm, '<div class="bullet-point">$1</div>')
+                
+                // Indent sub-bullets
+                .replace(/^\s{2,}-\s+(.+)$/gm, '<div class="subsection"><div class="bullet-point">$1</div></div>')
+                
+                // Convert code references
+                .replace(/`([^`]+)`/g, '<span class="inline-code">$1</span>')
+                
+                // Convert method/class names
+                .replace(/(\w+\.java|\w+\.js|\w+\.py|\w+Controller|\w+Service|\w+Handler|@\w+)/g, '<span class="inline-code">$1</span>')
+                
+                // Highlight recommendations
+                .replace(/(Sugerencia|Recomendación|Optimización)([^:\n]+)/gi, '<div class="recommendation"><strong>$1</strong>$2</div>')
+                
+                // Highlight warnings or problems
+                .replace(/(Problema|Advertencia|Cuidado)([^:\n]+)/gi, '<div class="warning"><strong>$1</strong>$2</div>')
+                
+                // Convert line breaks to proper HTML
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            
+            // Wrap in paragraphs and close open divs
+            html = '<div class="formatted-response"><p>' + html + '</p></div>';
+            
+            // Clean up extra tags
+            html = html.replace(/<\/p><p><\/p>/g, '</p><p>')
+                      .replace(/<p><\/p>/g, '')
+                      .replace(/<p><br><\/p>/g, '')
+                      .replace(/<p>\s*<\/p>/g, '');
+            
+            return html;
+        }
+        
+        function addMessageToChat(sender, message) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + sender;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (sender === 'assistant') {
+                // Format technical responses with better structure
+                contentDiv.innerHTML = formatTechnicalResponse(message);
+            } else {
+                // User messages remain as plain text
+                contentDiv.textContent = message;
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Check if export button should be enabled
+            checkExportButton();
+        }
+        
+        function startPolling() {
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/groups/jobs/' + currentJobId);
+                    const data = await response.json();
+                    updateProgress(data.job);
+                    
+                    if (data.job.status === 'completed' || data.job.status === 'error') {
+                        clearInterval(pollingInterval);
+                        
+                        if (data.job.status === 'completed') {
+                            showResults(data.job);
+                            // Reload groups to include the new one
+                            setTimeout(() => {
+                                loadIndexedGroups();
+                                document.getElementById('groupId').value = '';
+                            }, 2000);
+                        } else {
+                            showError(data.job.error || 'Error desconocido');
+                        }
+                        resetForm();
+                    }
+                } catch (error) {
+                    console.error('Error polling status:', error);
+                }
+            }, 2000);
+        }
+        
+        function updateProgress(data) {
+            switch (data.status) {
+                case 'initializing':
+                    updateStep(1, 'active', 'Inicializando sistema...');
+                    break;
+                case 'detecting':
+                    updateStep(1, 'completed', 'Sistema iniciado');
+                    updateStep(2, 'active', 'Detectando grupo ' + data.groupId + '...');
+                    break;
+                case 'cloning':
+                    updateStep(2, 'completed', 'Grupo encontrado: ' + (data.groupName || 'N/A'));
+                    updateStep(3, 'active', 'Clonando ' + (data.projectsFound || 0) + ' repositorios...');
+                    break;
+                case 'indexing':
+                    updateStep(3, 'completed', (data.projectsCloned || 0) + ' repositorios procesados');
+                    updateStep(4, 'active', 'Indexando archivos (' + (data.filesProcessed || 0) + ' archivos, ' + (data.totalChunks || 0) + ' chunks)...');
+                    break;
+                case 'completed':
+                    updateStep(4, 'completed', (data.filesProcessed || 0) + ' archivos indexados');
+                    updateStep(5, 'completed', 'Indexación completada exitosamente');
+                    break;
+                case 'error':
+                    const activeStep = getActiveStep();
+                    if (activeStep) {
+                        updateStep(activeStep, 'error', 'Error en este paso');
+                    }
+                    break;
+            }
+        }
+        
+        function updateStep(stepNumber, status, details) {
+            const stepIcon = document.getElementById('step' + stepNumber);
+            const stepDetails = document.getElementById('step' + stepNumber + '-details');
+            
+            if (stepIcon && stepDetails) {
+                stepIcon.className = 'step-icon ' + status;
+                stepDetails.textContent = details;
+                
+                if (status === 'completed') {
+                    stepIcon.textContent = '✓';
+                } else if (status === 'error') {
+                    stepIcon.textContent = '✗';
+                } else {
+                    stepIcon.textContent = stepNumber;
+                }
+            }
+        }
+        
+        function getActiveStep() {
+            for (let i = 1; i <= 5; i++) {
+                const stepIcon = document.getElementById('step' + i);
+                if (stepIcon && stepIcon.classList.contains('active')) {
+                    return i;
+                }
+            }
+            return null;
+        }
+        
+        function resetSteps() {
+            for (let i = 1; i <= 5; i++) {
+                updateStep(i, 'pending', 'Pendiente...');
+            }
+        }
+        
+        function showResults(data) {
+            const resultContainer = document.getElementById('resultContainer');
+            const stats = document.getElementById('stats');
+            
+            stats.innerHTML = 
+                '<div class="stat"><div class="stat-number">' + (data.projectsFound || 0) + '</div><div class="stat-label">Proyectos Encontrados</div></div>' +
+                '<div class="stat"><div class="stat-number">' + (data.projectsCloned || 0) + '</div><div class="stat-label">Repositorios Procesados</div></div>' +
+                '<div class="stat"><div class="stat-number">' + (data.filesProcessed || 0) + '</div><div class="stat-label">Archivos Indexados</div></div>' +
+                '<div class="stat"><div class="stat-number">' + (data.totalChunks || 0) + '</div><div class="stat-label">Chunks Generados</div></div>';
+            
+            resultContainer.style.display = 'block';
+        }
+        
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            errorMessage.textContent = message;
+            errorContainer.style.display = 'block';
+        }
+        
+        function resetForm() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.textContent = '🚀 Indexar';
+            
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
+        // Show notification function
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                opacity: 0;
+                transform: translateX(100%);
+                transition: all 0.3s ease;
+                max-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            
+            switch(type) {
+                case 'success':
+                    notification.style.backgroundColor = '#10b981';
+                    break;
+                case 'error':
+                    notification.style.backgroundColor = '#ef4444';
+                    break;
+                case 'warning':
+                    notification.style.backgroundColor = '#f59e0b';
+                    break;
+                default:
+                    notification.style.backgroundColor = '#3b82f6';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.style.opacity = '1';
+                notification.style.transform = 'translateX(0)';
+            }, 10);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize Repository Platform functionality
+        function initializeRepositoryPlatform() {
+            const platformRadios = document.querySelectorAll('input[name="repositoryPlatform"]');
+            
+            // Handle platform change
+            platformRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        const platform = this.value;
+                        const platformName = platform === 'gitlab' ? 'GitLab' : 'GitHub';
+                        
+                        // Send platform change to backend
+                        fetch('/api/platforms/switch', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ platform: platform })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                console.log('Plataforma cambiada a:', platformName);
+                                
+                                // Add visual feedback
+                                const platformSection = document.getElementById('platformProviderSection');
+                                platformSection.style.transform = 'scale(1.02)';
+                                setTimeout(() => {
+                                    platformSection.style.transform = 'scale(1)';
+                                }, 200);
+                                
+                                // Show notification
+                                showNotification(`Plataforma cambiada a ${platformName}`, 'success');
+                            } else {
+                                console.error('Error cambiando plataforma:', data.error);
+                                showNotification(`Error: ${data.error}`, 'error');
+                                // Revert radio selection
+                                const previousRadio = document.querySelector(`input[name="repositoryPlatform"]:not([value="${platform}"])`);
+                                if (previousRadio) previousRadio.checked = true;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error cambiando plataforma:', error);
+                            showNotification('Error de conexión al cambiar plataforma', 'error');
+                            // Revert radio selection
+                            const previousRadio = document.querySelector(`input[name="repositoryPlatform"]:not([value="${platform}"])`);
+                            if (previousRadio) previousRadio.checked = true;
+                        });
+                    }
+                });
+            });
+        }
+
+        // Initialize AI provider functionality
+        function initializeAIProvider() {
+            const providerRadios = document.querySelectorAll('input[name="aiProvider"]');
+            const activeProviderDisplay = document.getElementById('activeProvider');
+            
+            // Handle provider change
+            providerRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        const providerName = this.value === 'gemini' ? 'Google Gemini' : 
+                                         this.value === 'claude' ? 'Anthropic Claude' : 
+                                         this.value === 'openai' ? 'OpenAI GPT' : 'Google Gemini';
+                        activeProviderDisplay.textContent = providerName;
+                        
+                        // Add visual feedback
+                        const providerSection = document.getElementById('aiProviderSection');
+                        providerSection.style.transform = 'scale(1.02)';
+                        setTimeout(() => {
+                            providerSection.style.transform = 'scale(1)';
+                        }, 200);
+                        
+                        console.log('Proveedor de IA cambiado a:', providerName);
+                    }
+                });
+            });
+            
+            // Set initial display
+            const selectedProvider = document.querySelector('input[name="aiProvider"]:checked');
+            if (selectedProvider) {
+                const providerName = selectedProvider.value === 'gemini' ? 'Google Gemini' : 
+                                   selectedProvider.value === 'claude' ? 'Anthropic Claude' : 
+                                   selectedProvider.value === 'openai' ? 'OpenAI GPT' : 'Google Gemini';
+                activeProviderDisplay.textContent = providerName;
+            }
+        }
+
+        // Initialize providers when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                initializeRepositoryPlatform();
+                initializeAIProvider();
+            }, 100); // Small delay to ensure DOM is ready
+            setupEventListeners();
+        });
+
+        // Variables para el modal de confirmación
+        let pendingGroupId = null;
+        let pendingGroupName = null;
+        let pendingGroup = null;
+
+        // Función para mostrar el modal de confirmación
+        function showGroupChangeModal(group) {
+            console.log('showGroupChangeModal called with:', group);
+            if (!hasActiveConversation()) {
+                // Si no hay conversación activa, cambiar directamente
+                selectGroup(group);
+                return;
+            }
+            
+            pendingGroupId = group.id;
+            pendingGroupName = group.name;
+            pendingGroup = group; // Store the complete group object
+            document.getElementById('modalOverlay').style.display = 'block';
+        }
+
+        // Función para verificar si hay conversación activa
+        function hasActiveConversation() {
+            const chatMessages = document.getElementById('chatMessages');
+            const messages = chatMessages.querySelectorAll('.message.user');
+            return messages.length > 0;
+        }
+
+        // Función para cancelar el cambio de grupo
+        function cancelGroupChange() {
+            document.getElementById('modalOverlay').style.display = 'none';
+            pendingGroupId = null;
+            pendingGroupName = null;
+        }
+
+        // Función para confirmar el cambio de grupo
+        function confirmGroupChange() {
+            document.getElementById('modalOverlay').style.display = 'none';
+            
+            // Limpiar la conversación
+            clearConversation();
+            
+            // Cambiar al nuevo grupo
+            selectGroup(pendingGroup);
+            
+            pendingGroupId = null;
+            pendingGroupName = null;
+            pendingGroup = null;
+        }
+
+        // Función para limpiar la conversación
+        function clearConversation() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = `
+                <div class="message assistant">
+                    <div class="message-content">
+                        ¡Hola! Soy tu asistente de IA. Puedo ayudarte a consultar información sobre los proyectos indexados. ¿Qué te gustaría saber?
+                    </div>
+                </div>
+            `;
+            
+            // Deshabilitar botón de exportación
+            document.getElementById('exportBtn').disabled = true;
+        }
+
+        // Función para alternar el acordeón de grupos
+        function toggleGroupAccordion() {
+            const header = document.querySelector('.accordion-header');
+            const content = document.getElementById('accordionContent');
+            
+            header.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        // Función para exportar conversación a PDF
+        async function exportConversationPDF() {
+            const chatMessages = document.getElementById('chatMessages');
+            const messages = chatMessages.querySelectorAll('.message');
+            
+            if (messages.length <= 1) {
+                alert('No hay conversación para exportar');
+                return;
+            }
+
+            // Crear contenido HTML para el PDF
+            let htmlContent = `
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Conversación AI Assistant</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+                        .header { text-align: center; border-bottom: 2px solid #367d39; padding-bottom: 20px; margin-bottom: 30px; }
+                        .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; }
+                        .message.user { background: #e3f2fd; border-left: 4px solid #2196f3; }
+                        .message.assistant { background: #f1f8e9; border-left: 4px solid #4caf50; }
+                        .message-role { font-weight: bold; margin-bottom: 8px; }
+                        .message-content { line-height: 1.6; }
+                        .metadata { text-align: center; margin-top: 30px; color: #666; font-size: 12px; border-top: 1px solid #ddd; padding-top: 20px; }
+                        code { background: #f5f5f5; padding: 2px 4px; border-radius: 3px; }
+                        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🤖 AI Assistant - Conversación</h1>
+                        <p>Grupo: ${document.getElementById('activeGroupBadge').textContent}</p>
+                        <p>Fecha: ${new Date().toLocaleString('es-ES')}</p>
+                    </div>
+            `;
+
+            messages.forEach((message, index) => {
+                if (index === 0 && message.classList.contains('assistant')) return; // Saltar mensaje inicial
+                
+                const isUser = message.classList.contains('user');
+                const role = isUser ? 'Usuario' : 'Asistente';
+                const content = message.querySelector('.message-content').innerHTML;
+                
+                htmlContent += `
+                    <div class="message ${isUser ? 'user' : 'assistant'}">
+                        <div class="message-role">${role}:</div>
+                        <div class="message-content">${content}</div>
+                    </div>
+                `;
+            });
+
+            htmlContent += `
+                    <div class="metadata">
+                        <p>Generado por AI Assistant - ${new Date().toLocaleString('es-ES')}</p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // Crear y descargar el archivo
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `conversacion-ai-assistant-${new Date().toISOString().split('T')[0]}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Función para habilitar el botón de exportación cuando hay mensajes
+        function checkExportButton() {
+            const chatMessages = document.getElementById('chatMessages');
+            const userMessages = chatMessages.querySelectorAll('.message.user');
+            const exportBtn = document.getElementById('exportBtn');
+            exportBtn.disabled = userMessages.length === 0;
+        }
+    </script>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <span class="footer-text">Created by</span>
+            <span class="footer-highlight">Luis Nuñez</span>
+            <span class="footer-divider">&</span>
+            <span class="footer-icon">🤖</span>
+            <span class="footer-highlight">GitHub Copilot</span>
+            <span class="footer-divider">•</span>
+            <span class="footer-text">2025</span>
+        </div>
+    </footer>
+
+    <!-- Modal de confirmación -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="icon">⚠️</span>
+                Cambiar de grupo
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que deseas cambiar de grupo? La conversación actual se perderá y no podrá ser recuperada.
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="modalCancelBtn">Cancelar</button>
+                <button class="modal-btn confirm" id="modalConfirmBtn">Cambiar grupo</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

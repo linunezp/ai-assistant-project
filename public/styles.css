@@ -1,0 +1,189 @@
+:root{--bg:#f6f8fa;--card:#fff;--muted:#666}
+body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:var(--bg); margin:0; padding:20px}
+#app{max-width:900px;margin:0 auto}
+header h1{margin:0 0 12px 0}
+.panel{background:var(--card);padding:16px;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-bottom:12px}
+.panel h2{margin-top:0}
+textarea{width:100%;min-height:80px}
+.controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+.hidden{display:none}
+pre{background:#f0f3f6;padding:12px;border-radius:6px;overflow:auto}
+footer{margin-top:12px;text-align:center;color:var(--muted)}
+
+/* JSON pretty print styles */
+code.json{display:block;white-space:pre-wrap;font-family:SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:13px}
+code.json .key{color:#92278f;font-weight:600}
+code.json .string{color:#c41a16}
+code.json .number{color:#1c00cf}
+code.json .boolean{color:#aa0d91}
+code.json .null{color:#808080;font-style:italic}
+
+.kb-summary{font-weight:600;margin-bottom:8px}
+.meta{color:#666;font-size:12px;margin-top:6px}
+
+/* AI Selector styles */
+.ai-selector{margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ai-selector label{font-weight:600;color:#333}
+.ai-selector select{padding:6px 12px;border:1px solid #ddd;border-radius:4px;background:white;min-width:160px}
+.ai-status{font-size:12px;color:#666;font-style:italic}
+.ai-status.connected{color:#28a745}
+.ai-status.error{color:#dc3545}
+
+/* Reindex Progress Indicator Styles */
+.reindex-progress {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    transition: opacity 0.5s ease;
+}
+
+.reindex-progress::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.progress-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.progress-status {
+    font-size: 14px;
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+.progress-bar {
+    background: rgba(255,255,255,0.2);
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #00d4ff, #090979);
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: progress-shine 1.5s infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.progress-item {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+.progress-label {
+    display: block;
+    font-size: 12px;
+    opacity: 0.8;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.progress-value {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #00d4ff;
+}
+
+.progress-log {
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 120px;
+    overflow-y: auto;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+    font-size: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+}
+
+.progress-log::-webkit-scrollbar {
+    width: 6px;
+}
+
+.progress-log::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.progress-log::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+}
+
+.log-entry {
+    margin-bottom: 4px;
+    line-height: 1.4;
+    opacity: 0;
+    animation: fadeInLog 0.3s ease forwards;
+}
+
+.log-entry:last-child {
+    margin-bottom: 0;
+}
+
+@keyframes fadeInLog {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.log-time {
+    color: #00d4ff;
+    margin-right: 8px;
+    font-weight: 500;
+}
